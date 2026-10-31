@@ -2,6 +2,8 @@
 
 A small authoritative multiplayer 3D economy game for up to 12 players per town. Players open logging companies, farms, furniture factories, and retail stores; produce and trade physical goods; hire workers; issue and trade shares; and distribute dividends.
 
+The expanded low-poly city includes 48 business plots, a broad road grid, an industrial district, moving delivery traffic, and an instanced skyline tuned for smooth browser rendering.
+
 ## Run locally
 
 Requirements: Node.js 22.5+ (the project uses the built-in SQLite module).
@@ -17,7 +19,7 @@ Progress is saved to `data/market-square.db`. Production is driven only while th
 
 ## Controls
 
-- **WASD:** walk
+- **WASD:** move quickly through the expanded city
 - **Drag mouse:** orbit the camera
 - **Mouse wheel:** smoothly zoom in and out
 - **Click a building:** open its company panel

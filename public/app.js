@@ -5,7 +5,7 @@ const uid=()=>crypto.randomUUID();
 const playerId=localStorage.msPlayerId||(localStorage.msPlayerId=uid());
 let ws,state=null,me=null,currentPanel='',selectedBusiness=null,tutorialDismissed=false,pendingBusinessOpen=false;
 const BUSINESS={logging:{name:'Logging Company',icon:'🌲',cost:120,color:0x8c6746},farm:{name:'Farm',icon:'🌾',cost:100,color:0xd5ae52},factory:{name:'Furniture Factory',icon:'⚙',cost:180,color:0x7d8790},store:{name:'Retail Store',icon:'◆',cost:140,color:0x557b9d}};
-const PLOTS=[[-18,-13],[-6,-13],[6,-13],[18,-13],[-18,0],[-6,0],[6,0],[18,0],[-18,13],[-6,13],[6,13],[18,13]].map(([x,z],id)=>({id,x,z}));
+const PLOTS=[[-18,-13],[-6,-13],[6,-13],[18,-13],[-18,0],[-6,0],[6,0],[18,0],[-18,13],[-6,13],[6,13],[18,13],...[-72,-54,-36,36,54,72].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z]))].map(([x,z],id)=>({id,x,z}));
 const money=n=>`$${Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const age=t=>{const s=Math.max(0,Math.floor((Date.now()-t)/1000));return s<60?`${s}s ago`:`${Math.floor(s/60)}m ago`};
@@ -13,14 +13,15 @@ const toast=(msg,bad=false)=>{const e=$('#toast');e.textContent=msg;e.style.back
 const send=(type,data={})=>{if(ws?.readyState===1)ws.send(JSON.stringify({type,...data}));};
 
 // --- Three.js town ----------------------------------------------------------
-const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9d7df);scene.fog=new THREE.Fog(0xb9d7df,50,95);
-const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,150);camera.position.set(0,8,12);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('#world').append(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xeaf8ff,0x72865b,2.2));const sun=new THREE.DirectionalLight(0xfff2d4,2.8);sun.position.set(-20,35,18);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-45;sun.shadow.camera.right=45;sun.shadow.camera.top=40;sun.shadow.camera.bottom=-40;scene.add(sun);
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(90,72),new THREE.MeshLambertMaterial({color:0x8eb274}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9d7df);scene.fog=new THREE.Fog(0xb9d7df,110,260);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,320);camera.position.set(0,8,12);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;$('#world').append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xeaf8ff,0x72865b,2.2));const sun=new THREE.DirectionalLight(0xfff2d4,2.8);sun.position.set(-35,55,28);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-70;sun.shadow.camera.right=70;sun.shadow.camera.top=65;sun.shadow.camera.bottom=-65;scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(220,170),new THREE.MeshLambertMaterial({color:0x8eb274}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
 const mat=c=>new THREE.MeshLambertMaterial({color:c});
-function box(w,h,d,c,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;scene.add(m);return m}
-box(64,.12,5,0xc8c3b4,0,.07,0);box(5,.13,54,0xc8c3b4,0,.08,0);
+function box(w,h,d,c,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));m.position.set(x,y,z);m.castShadow=false;m.receiveShadow=true;scene.add(m);return m}
+for(const z of [-60,-40,-20,0,20,40,60])box(205,.12,5,0xc8c3b4,0,.07,z);
+for(const x of [-81,-63,-45,-27,0,27,45,63,81])box(5,.13,155,0xc8c3b4,x,.08,0);
 for(const [x,z] of [[-24,-21],[-12,-21],[12,-21],[24,-21],[-24,21],[-12,21],[12,21],[24,21],[-28,-7],[28,-7],[-28,7],[28,7]]){
   const trunk=box(.45,2,.45,0x76533b,x,1,z);const crown=new THREE.Mesh(new THREE.ConeGeometry(1.7,4,7),mat(0x3f7952));crown.position.set(x,3.4,z);crown.castShadow=true;scene.add(crown);
 }
@@ -34,10 +35,13 @@ for(const [x,w,c] of [[-23,10,0x65747a],[-10,9,0x8a6f5c],[7,11,0x6f777e],[22,9,0
 for(const x of [-27,-18,-9,9,18,27]){box(.16,3.2,.16,0x35423e,x,1.6,-24.8);const lamp=new THREE.Mesh(new THREE.SphereGeometry(.28,8,6),new THREE.MeshBasicMaterial({color:0xffe2a3}));lamp.position.set(x,3.25,-24.8);scene.add(lamp)}
 const townVehicles=[];
 for(const [x,c,speed] of [[-18,0xd9a84c,2.1],[5,0x3f7f9a,1.6],[22,0xb54b45,2.5]]){const van=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.15,1.35),mat(c));body.position.y=.8;body.castShadow=true;van.add(body);const cab=new THREE.Mesh(new THREE.BoxGeometry(1.1,.8,1.36),mat(0xe9e3d6));cab.position.set(-.75,1.45,0);van.add(cab);for(const dx of [-.8,.8])for(const dz of [-.7,.7]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,.16,10),mat(0x222725));wheel.rotation.x=Math.PI/2;wheel.position.set(dx,.35,dz);van.add(wheel)}van.position.set(x,0,-28);van.userData={speed,start:x};townVehicles.push(van);scene.add(van)}
+// One draw call for a broad skyline: large city feel without dozens of costly meshes.
+const skylineCount=96,skyline=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),skylineCount),skyMatrix=new THREE.Matrix4(),skyColor=new THREE.Color();
+for(let i=0;i<skylineCount;i++){const side=i%4,along=((i*37)%95)-47.5,w=5+(i*13%7),d=5+(i*17%8),h=5+(i*19%15);let x,z;if(side===0){x=along*2;z=-78}else if(side===1){x=along*2;z=78}else if(side===2){x=-105;z=along*1.55}else{x=105;z=along*1.55}skyMatrix.compose(new THREE.Vector3(x,h/2,z),new THREE.Quaternion(),new THREE.Vector3(w,h,d));skyline.setMatrixAt(i,skyMatrix);skyColor.setHSL(.52+(i%5)*.015,.1,.38+(i%4)*.07);skyline.setColorAt(i,skyColor)}skyline.receiveShadow=true;scene.add(skyline);
 // plaza fountain and marketplace canopy
 const fountain=new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.5,.7,16),mat(0x78969d));fountain.position.set(0,.35,0);fountain.receiveShadow=true;scene.add(fountain);
 const water=new THREE.Mesh(new THREE.CylinderGeometry(2.7,2.7,.08,20),new THREE.MeshPhongMaterial({color:0x65b8c9,shininess:80}));water.position.set(0,.74,0);scene.add(water);
-for(const p of PLOTS){const base=new THREE.Mesh(new THREE.BoxGeometry(8,.1,8),new THREE.MeshLambertMaterial({color:0xd4cba8,transparent:true,opacity:.72}));base.position.set(p.x,.09,p.z);base.userData={plotId:p.id};scene.add(base)}
+const plotBases=new THREE.InstancedMesh(new THREE.BoxGeometry(12,.1,12),new THREE.MeshLambertMaterial({color:0xd4cba8,transparent:true,opacity:.72}),PLOTS.length);const plotMatrix=new THREE.Matrix4();PLOTS.forEach((p,i)=>{plotMatrix.makeTranslation(p.x,.09,p.z);plotBases.setMatrixAt(i,plotMatrix)});plotBases.receiveShadow=true;scene.add(plotBases);
 const playerMeshes=new Map(),businessMeshes=new Map();
 function labelSprite(text,bg='#244a3b'){const c=document.createElement('canvas');c.width=512;c.height=96;const x=c.getContext('2d');x.fillStyle=bg;x.roundRect(4,4,504,84,18);x.fill();x.fillStyle='white';x.font='bold 28px system-ui';x.textAlign='center';x.textBaseline='middle';x.fillText(text.slice(0,28),256,48);const tx=new THREE.CanvasTexture(c);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tx,transparent:true}));s.scale.set(6.5,1.22,1);return s}
 function makePlayer(p){const g=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.85,4,8),mat(new THREE.Color(p.color)));body.position.y=1.05;body.castShadow=true;g.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.36,12,8),mat(0xe1aa82));head.position.y=1.95;head.castShadow=true;g.add(head);const l=labelSprite(p.name,'#1f2b27');l.position.y=2.75;l.scale.set(2.9,.54,1);g.add(l);scene.add(g);return g}
@@ -51,15 +55,15 @@ function makeBusiness(b){const g=new THREE.Group();g.position.set(b.x,0,b.z);con
   if(b.type==='store'){const awning=new THREE.Mesh(new THREE.BoxGeometry(3,.28,1),mat(0xd7a643));awning.position.set(0,2.25,2.9);g.add(awning)}
   const l=labelSprite(b.name);l.position.set(0,5.6,0);g.add(l);g.userData={businessId:b.id,companyName:b.name};g.traverse(o=>o.userData={...o.userData,businessId:b.id});scene.add(g);return g
 }
-let yaw=0,pitch=.35,drag=false,lastX=0,lastY=0,targetDistance=10,cameraDistance=10;const keys={};
+let yaw=0,pitch=.35,drag=false,lastX=0,lastY=0,targetDistance=10,cameraDistance=10,localReady=false;const keys={},localPosition=new THREE.Vector3(),cameraTarget=new THREE.Vector3();
 addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);
 renderer.domElement.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY});addEventListener('pointerup',()=>drag=false);addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-lastX)*.006;pitch=Math.max(.1,Math.min(.85,pitch+(e.clientY-lastY)*.004));lastX=e.clientX;lastY=e.clientY});
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();targetDistance=Math.max(4,Math.min(20,targetDistance+e.deltaY*.012))},{passive:false});
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();renderer.domElement.addEventListener('click',e=>{if(Math.abs(e.clientX-lastX)>4)return;mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight*2-1);ray.setFromCamera(mouse,camera);const hit=ray.intersectObjects([...businessMeshes.values()],true)[0];if(hit){let o=hit.object;const id=o.userData.businessId;if(id){selectedBusiness=id;openPanel('business')}}});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 let last=performance.now(),lastMove=0;
-function animate(t){requestAnimationFrame(animate);const dt=Math.min(.05,(t-last)/1000);last=t;cameraDistance=THREE.MathUtils.damp(cameraDistance,targetDistance,7,dt);townVehicles.forEach((v,i)=>{v.position.x=((v.userData.start+40+t*.001*v.userData.speed)%80)-40;v.rotation.y=i%2?Math.PI:0});if(me){let dx=(keys.KeyD?1:0)-(keys.KeyA?1:0),dz=(keys.KeyS?1:0)-(keys.KeyW?1:0);if(dx||dz){const len=Math.hypot(dx,dz);dx/=len;dz/=len;const sin=Math.sin(yaw),cos=Math.cos(yaw);me.x=Math.max(-29,Math.min(29,me.x+(dx*cos-dz*sin)*7*dt));me.z=Math.max(-24,Math.min(24,me.z+(dx*sin+dz*cos)*7*dt));if(t-lastMove>100){send('move',{x:me.x,z:me.z});lastMove=t}}
-    const target=new THREE.Vector3(me.x,.75,me.z),cp=Math.cos(pitch);camera.position.set(target.x+Math.sin(yaw)*cp*cameraDistance,target.y+Math.sin(pitch)*cameraDistance,target.z+Math.cos(yaw)*cp*cameraDistance);camera.lookAt(target);
+function animate(t){requestAnimationFrame(animate);const dt=Math.min(.05,(t-last)/1000);last=t;cameraDistance=THREE.MathUtils.damp(cameraDistance,targetDistance,7,dt);townVehicles.forEach((v,i)=>{v.position.x=((v.userData.start+100+t*.001*v.userData.speed)%200)-100;v.rotation.y=i%2?Math.PI:0});if(me&&localReady){let dx=(keys.KeyD?1:0)-(keys.KeyA?1:0),dz=(keys.KeyS?1:0)-(keys.KeyW?1:0);if(dx||dz){const len=Math.hypot(dx,dz);dx/=len;dz/=len;const sin=Math.sin(yaw),cos=Math.cos(yaw);localPosition.x=Math.max(-100,Math.min(100,localPosition.x+(dx*cos-dz*sin)*15*dt));localPosition.z=Math.max(-75,Math.min(75,localPosition.z+(dx*sin+dz*cos)*15*dt));if(t-lastMove>80){send('move',{x:localPosition.x,z:localPosition.z});lastMove=t}}
+    cameraTarget.set(localPosition.x,.75,localPosition.z);const cp=Math.cos(pitch);camera.position.set(cameraTarget.x+Math.sin(yaw)*cp*cameraDistance,cameraTarget.y+Math.sin(pitch)*cameraDistance,cameraTarget.z+Math.cos(yaw)*cp*cameraDistance);camera.lookAt(cameraTarget);
   }renderer.render(scene,camera)}animate(performance.now());
 
 function syncWorld(){
@@ -70,7 +74,7 @@ function syncWorld(){
 
 // --- UI --------------------------------------------------------------------
 function connect(code,name){
-  ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);ws.onopen=()=>send('join',{code,playerId,name});ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='roomCreated')connect(m.code,name);if(m.type==='error'){pendingBusinessOpen=false;toast(m.message,true)}if(m.type==='state'){state=m.state;me=state.players[playerId];if(!me)return;if(pendingBusinessOpen&&me.businesses.length){selectedBusiness=me.businesses.at(-1);pendingBusinessOpen=false;toast('Company opened. Start your first batch!')}$('#lobby').classList.remove('open');['#topbar','#hud','#dock','#crosshair','#hint','#tutorial'].forEach(s=>$(s).classList.remove('hidden'));localStorage.msRoom=state.code;localStorage.msName=me.name;render();syncWorld();}};ws.onclose=()=>state&&setTimeout(()=>connect(state.code,localStorage.msName),1200);
+  localReady=false;ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);ws.onopen=()=>send('join',{code,playerId,name});ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='roomCreated')connect(m.code,name);if(m.type==='error'){pendingBusinessOpen=false;toast(m.message,true)}if(m.type==='positions'&&state){for(const[id,pos]of Object.entries(m.positions))if(id!==playerId&&state.players[id])Object.assign(state.players[id],pos);syncWorld();return}if(m.type==='state'){state=m.state;me=state.players[playerId];if(!me)return;if(!localReady){localPosition.set(me.x,0,me.z);localReady=true}if(pendingBusinessOpen&&me.businesses.length){selectedBusiness=me.businesses.at(-1);pendingBusinessOpen=false;toast('Company opened. Start your first batch!')}$('#lobby').classList.remove('open');['#topbar','#hud','#dock','#crosshair','#hint','#tutorial'].forEach(s=>$(s).classList.remove('hidden'));localStorage.msRoom=state.code;localStorage.msName=me.name;render();syncWorld();}};ws.onclose=()=>state&&setTimeout(()=>connect(state.code,localStorage.msName),1200);
 }
 $('#playerName').value=localStorage.msName||'';$('#roomCode').value=new URLSearchParams(location.search).get('room')||localStorage.msRoom||'';
 $('#createRoom').onclick=()=>{const name=$('#playerName').value.trim();if(!name)return toast('Enter your name first.',true);ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);ws.onopen=()=>send('createRoom');ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='roomCreated'){ws.close();connect(m.code,name)}}};

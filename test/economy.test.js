@@ -24,6 +24,7 @@ test('authoritative two-player goods and stock trades persist',async t=>{
   send(a,'renameBusiness',{businessId:'B1',name:'North Star Timber'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1?.name==='North Star Timber')).state;assert.equal(s.businesses.B1.name,'North Star Timber');
   send(a,'transferCash',{businessId:'B1',amount:100,direction:'toBusiness'});await onceMessage(a,'state',m=>m.state.businesses.B1.cash===100);
   const b=await open(`ws://localhost:${port}`);t.after(()=>b.close());send(b,'join',{code:room,playerId:'bob',name:'Bob'});await onceMessage(b,'state',m=>m.state.players.bob);
+  send(b,'move',{x:82,z:61});const movement=await onceMessage(a,'positions',m=>m.positions.bob?.x===82);assert.equal(movement.positions.bob.z,61);
   send(b,'openBusiness',{businessType:'farm',plotId:1,name:'Bob Farm'});await onceMessage(b,'state',m=>m.state.businesses.B2);
   // Produce wood, then escrow it in a sell order.
   send(a,'produce',{businessId:'B1'});await onceMessage(a,'state',m=>m.state.businesses.B1.productionEnds>0);await delay(12200);s=(await onceMessage(a,'state',m=>m.state.businesses.B1.inventory.wood===3,3000)).state;

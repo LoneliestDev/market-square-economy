@@ -20,7 +20,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS rooms (
 const PORT = Number(process.env.PORT || 3000);
 const MAX_PLAYERS = 12;
 const PLOTS = [
-  [-18,-13],[-6,-13],[6,-13],[18,-13],[-18,0],[-6,0],[6,0],[18,0],[-18,13],[-6,13],[6,13],[18,13]
+  [-18,-13],[-6,-13],[6,-13],[18,-13],[-18,0],[-6,0],[6,0],[18,0],[-18,13],[-6,13],[6,13],[18,13],
+  ...[-72,-54,-36,36,54,72].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z]))
 ].map(([x,z], id) => ({ id, x, z }));
 const BUSINESS = {
   logging: { name:'Logging Co.', cost:120, output:'wood', seconds:12, amount:3, input:{} },
@@ -171,13 +172,14 @@ const server=http.createServer(async(req,res)=>{ try{ const url=new URL(req.url,
 const wss=new WebSocketServer({server});
 function send(ws,type,payload={}){if(ws.readyState===1)ws.send(JSON.stringify({type,...payload}));}
 function broadcast(room){const state=publicState(room);for(const ws of wss.clients)if(ws.roomCode===room.code)send(ws,'state',{state});}
+function broadcastPositions(room){const positions=Object.fromEntries(Object.entries(room.players).map(([id,p])=>[id,{x:p.x,z:p.z,online:p.online}]));for(const ws of wss.clients)if(ws.roomCode===room.code)send(ws,'positions',{positions});}
 function fail(ws,e){send(ws,'error',{message:e.message||'Request failed.'});}
 wss.on('connection',ws=>{
   ws.on('message',raw=>{ let m;try{m=JSON.parse(raw)}catch{return fail(ws,Error('Bad message.'))} try{
     if(m.type==='createRoom'){let c;do{c=code()}while(loadRoom(c));const r=freshRoom(c);rooms.set(c,r);saveRoom(r);send(ws,'roomCreated',{code:c});return;}
     if(m.type==='join'){const c=String(m.code||'').toUpperCase();const r=getRoom(c);if(!r)throw Error('Room not found.');const online=[...wss.clients].filter(x=>x.roomCode===c).length;if(online>=MAX_PLAYERS&&!r.players[m.playerId])throw Error('Room is full.');ws.roomCode=c;ws.playerId=String(m.playerId);ensurePlayer(r,ws.playerId,m.name);saveRoom(r);broadcast(r);return;}
     const r=getRoom(ws.roomCode);if(!r)throw Error('Join a room first.');const p=r.players[ws.playerId];if(!p)throw Error('Player not found.');
-    if(m.type==='move'){p.x=Math.max(-29,Math.min(29,Number(m.x)||0));p.z=Math.max(-24,Math.min(24,Number(m.z)||0));}
+    if(m.type==='move'){p.x=Math.max(-100,Math.min(100,Number(m.x)||0));p.z=Math.max(-75,Math.min(75,Number(m.z)||0));broadcastPositions(r);return;}
     else if(m.type==='openBusiness')createBusiness(r,p,m.businessType,m.plotId,m.name);
     else if(m.type==='renameBusiness'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);const name=safeName(m.name);if(name.length<2)throw Error('Company name must be at least 2 characters.');b.name=name;}
     else if(m.type==='produce')startProduction(r,r.businesses[m.businessId],p.id);
