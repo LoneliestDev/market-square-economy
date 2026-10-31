@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Market Square — Multiplayer Economy</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="world"></div>
+  <div id="toast" role="status"></div>
+
+  <section id="lobby" class="modal open">
+    <div class="card lobby-card">
+      <div class="brand"><span class="mark">M</span><div><h1>Market Square</h1><p>A town built by its players.</p></div></div>
+      <label>Your name<input id="playerName" maxlength="20" placeholder="Enter a name"></label>
+      <div class="lobby-actions"><button id="createRoom" class="primary">Create a town</button><span>or</span></div>
+      <label>Room code<div class="inline"><input id="roomCode" maxlength="5" placeholder="ABCDE"><button id="joinRoom">Join</button></div></label>
+      <p class="fine">Up to 12 players · Progress saves automatically</p>
+    </div>
+  </section>
+
+  <header id="topbar" class="hidden">
+    <div class="brand small"><span class="mark">M</span><b>MARKET SQUARE</b></div>
+    <div class="room-pill">ROOM <b id="codeLabel"></b><button id="copyCode" title="Copy room code">⧉</button></div>
+    <div class="stat"><span>PERSONAL CASH</span><b id="cash">$500.00</b></div>
+    <div class="stat"><span>ONLINE</span><b id="online">1 / 12</b></div>
+  </header>
+
+  <aside id="hud" class="hidden">
+    <div class="hud-card"><span class="eyebrow">INVENTORY</span><div id="inventory" class="inventory"></div></div>
+    <div class="hud-card"><span class="eyebrow">YOUR BUSINESSES</span><div id="owned" class="owned"></div></div>
+  </aside>
+
+  <nav id="dock" class="hidden">
+    <button data-panel="business"><span>▦</span>Business</button>
+    <button data-panel="market"><span>⇄</span>Goods market</button>
+    <button data-panel="stocks"><span>↗</span>Stock exchange</button>
+    <button data-panel="players"><span>♙</span>Players</button>
+  </nav>
+
+  <div id="crosshair" class="hidden">+</div>
+  <div id="hint" class="hidden">WASD to move · Drag mouse to look · Click a building to manage</div>
+
+  <section id="panel" class="panel hidden" aria-live="polite">
+    <button id="closePanel" class="close">×</button>
+    <div id="panelContent"></div>
+  </section>
+
+  <section id="tutorial" class="tutorial hidden">
+    <div class="step"><span id="tutorialNum">1</span><div><b id="tutorialTitle">Claim your first plot</b><p id="tutorialText">Open Business, pick a free plot and choose a company type.</p></div><button id="dismissTutorial">×</button></div>
+    <div class="progress"><i id="tutorialProgress"></i></div>
+  </section>
+
+  <template id="empty"></template>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
