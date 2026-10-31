@@ -179,6 +179,7 @@ wss.on('connection',ws=>{
     const r=getRoom(ws.roomCode);if(!r)throw Error('Join a room first.');const p=r.players[ws.playerId];if(!p)throw Error('Player not found.');
     if(m.type==='move'){p.x=Math.max(-29,Math.min(29,Number(m.x)||0));p.z=Math.max(-24,Math.min(24,Number(m.z)||0));}
     else if(m.type==='openBusiness')createBusiness(r,p,m.businessType,m.plotId,m.name);
+    else if(m.type==='renameBusiness'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);const name=safeName(m.name);if(name.length<2)throw Error('Company name must be at least 2 characters.');b.name=name;}
     else if(m.type==='produce')startProduction(r,r.businesses[m.businessId],p.id);
     else if(m.type==='hire'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);const n=qty(m.count);debit(p,n*25);b.workers+=n;b.expenses=money(b.expenses+n*25);}
     else if(m.type==='toggleAuto'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);if(!b.workers)throw Error('Hire a worker first.');b.auto=!b.auto;if(b.auto&&!b.productionEnds&&BUSINESS[b.type].output)startProduction(r,b,p.id);}

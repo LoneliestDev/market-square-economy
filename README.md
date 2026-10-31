@@ -19,6 +19,7 @@ Progress is saved to `data/market-square.db`. Production is driven only while th
 
 - **WASD:** walk
 - **Drag mouse:** orbit the camera
+- **Mouse wheel:** smoothly zoom in and out
 - **Click a building:** open its company panel
 - **Bottom dock:** open business, goods market, stock exchange, and player panels
 
@@ -29,6 +30,7 @@ Progress is saved to `data/market-square.db`. Production is driven only while th
 - Open orders can be cancelled, returning all remaining escrow.
 - Production takes 10–18 seconds and factory batches consume 3 wood.
 - Retail stores can sell food and furniture to budget-limited, price-sensitive NPC customers.
+- Owners choose and can rename their companies; advanced share tools stay collapsed during normal operations.
 - Stock prices are only created by completed buy/sell order matches.
 - New share issues are capped at 2,000 total shares per company and dilute existing ownership.
 - Dividends cannot exceed company cash and are paid proportionally to current shareholders.

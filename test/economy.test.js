@@ -21,6 +21,7 @@ test('authoritative two-player goods and stock trades persist',async t=>{
   const a=await open(`ws://localhost:${port}`);t.after(()=>a.close());send(a,'createRoom');const room=(await onceMessage(a,'roomCreated')).code;
   send(a,'join',{code:room,playerId:'alice',name:'Alice'});let s=(await onceMessage(a,'state',m=>m.state.players.alice)).state;
   send(a,'openBusiness',{businessType:'logging',plotId:0,name:'Alice Timber'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1)).state;
+  send(a,'renameBusiness',{businessId:'B1',name:'North Star Timber'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1?.name==='North Star Timber')).state;assert.equal(s.businesses.B1.name,'North Star Timber');
   send(a,'transferCash',{businessId:'B1',amount:100,direction:'toBusiness'});await onceMessage(a,'state',m=>m.state.businesses.B1.cash===100);
   const b=await open(`ws://localhost:${port}`);t.after(()=>b.close());send(b,'join',{code:room,playerId:'bob',name:'Bob'});await onceMessage(b,'state',m=>m.state.players.bob);
   send(b,'openBusiness',{businessType:'farm',plotId:1,name:'Bob Farm'});await onceMessage(b,'state',m=>m.state.businesses.B2);
