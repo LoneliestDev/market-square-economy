@@ -28,10 +28,13 @@ Rooms run in monthly seasons. On the first UTC day of each month, money, compani
 
 ## Economy notes
 
-- Player cash and company cash are separate. Deposit money into a company before it buys supplies.
+- New players start with $1,000. Businesses cost $70–$120 and include $50 in company working cash.
+- The main loop is intentionally direct: produce goods, sell real inventory to the town wholesaler, then collect company cash personally.
+- Factories begin with enough wood for three batches and stores begin with food and furniture, so every starter choice can earn immediately.
+- Player cash and company cash remain separate for accounting; advanced funding controls are collapsed by default.
 - Sell orders escrow real inventory; buy orders escrow real company/player cash.
 - Open orders can be cancelled, returning all remaining escrow.
-- Production takes 10–18 seconds and factory batches consume 3 wood.
+- Production takes 6–10 seconds; factory batches consume 2 wood and make 2 furniture.
 - Retail stores can sell food and furniture to budget-limited, price-sensitive NPC customers.
 - Owners choose and can rename their companies; advanced share tools stay collapsed during normal operations.
 - Stock prices are only created by completed buy/sell order matches.

@@ -27,12 +27,13 @@ const PLOTS = [
   ...[-90,90].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z]))
 ].map(([x,z], id) => ({ id, x, z }));
 const BUSINESS = {
-  logging: { name:'Logging Co.', cost:120, output:'wood', seconds:12, amount:3, input:{} },
-  farm: { name:'Farm', cost:100, output:'food', seconds:10, amount:3, input:{} },
-  factory: { name:'Furniture Factory', cost:180, output:'furniture', seconds:18, amount:1, input:{ wood:3 } },
-  store: { name:'Retail Store', cost:140, output:null, seconds:0, amount:0, input:{} }
+  logging: { name:'Logging Co.', cost:80, output:'wood', seconds:6, amount:5, input:{} },
+  farm: { name:'Farm', cost:70, output:'food', seconds:6, amount:5, input:{} },
+  factory: { name:'Furniture Factory', cost:120, output:'furniture', seconds:10, amount:2, input:{ wood:2 } },
+  store: { name:'Retail Store', cost:100, output:null, seconds:0, amount:0, input:{} }
 };
 const STARTER_STOCK = { wood:0, food:0, furniture:0 };
+const WHOLESALE = { wood:4, food:6, furniture:32 };
 
 const copy = x => JSON.parse(JSON.stringify(x));
 const now = () => Date.now();
@@ -43,18 +44,19 @@ const code = () => Math.random().toString(36).slice(2,7).toUpperCase();
 const safeName = v => String(v || 'Player').replace(/[^a-zA-Z0-9 _-]/g,'').trim().slice(0,20) || 'Player';
 
 function freshRoom(roomCode) {
-  return { code:roomCode, createdAt:now(), season:seasonName(now()), resetsAt:nextMonthStart(), players:{}, businesses:{}, goodsOrders:[], stockOrders:[], transactions:[], stockTrades:[], npcFund:4000, nextBusiness:1, nextOrder:1 };
+  return { code:roomCode, createdAt:now(), season:seasonName(now()), resetsAt:nextMonthStart(), balanceVersion:2, players:{}, businesses:{}, goodsOrders:[], stockOrders:[], transactions:[], stockTrades:[], npcFund:10000, nextBusiness:1, nextOrder:1 };
 }
+function ensureBalance(room){if(room.balanceVersion===2)return false;for(const p of Object.values(room.players))p.cash=money((p.cash||0)+500);for(const b of Object.values(room.businesses))b.cash=money((b.cash||0)+50);room.npcFund=Math.max(room.npcFund||0,10000);room.balanceVersion=2;return true;}
 function ensureSeason(room) {
   if(!room.resetsAt){room.season=seasonName(now());room.resetsAt=nextMonthStart();return false;}
   if(now()<room.resetsAt)return false;
-  for(const p of Object.values(room.players)){p.cash=500;p.inventory=copy(STARTER_STOCK);p.businesses=[];p.holdings={};p.x=0;p.z=22;}
-  room.businesses={};room.goodsOrders=[];room.stockOrders=[];room.transactions=[];room.stockTrades=[];room.npcFund=4000;room.nextBusiness=1;room.nextOrder=1;room.season=seasonName(now());room.resetsAt=nextMonthStart();return true;
+  for(const p of Object.values(room.players)){p.cash=1000;p.inventory=copy(STARTER_STOCK);p.businesses=[];p.holdings={};p.x=0;p.z=22;}
+  room.businesses={};room.goodsOrders=[];room.stockOrders=[];room.transactions=[];room.stockTrades=[];room.npcFund=10000;room.nextBusiness=1;room.nextOrder=1;room.season=seasonName(now());room.resetsAt=nextMonthStart();room.balanceVersion=2;return true;
 }
 function loadRoom(roomCode) {
   const row = db.prepare('SELECT state,updated_at FROM rooms WHERE code=?').get(roomCode);
   if(!row)return null;
-  const room=JSON.parse(row.state),offlineFor=Math.max(0,now()-Number(row.updated_at));ensureSeason(room);
+  const room=JSON.parse(row.state),offlineFor=Math.max(0,now()-Number(row.updated_at));ensureBalance(room);ensureSeason(room);
   // Active batches are paused, not completed, while this room is unloaded/offline.
   for(const b of Object.values(room.businesses))if(b.productionEnds>row.updated_at)b.productionEnds+=offlineFor;
   return room;
@@ -68,11 +70,11 @@ function publicState(room) {
   return { ...room, players:Object.fromEntries(Object.entries(room.players).map(([id,p]) => [id,{...p, token:undefined}])) };
 }
 const rooms = new Map();
-function getRoom(c) { if(!c)return null; let r=rooms.get(c); if(!r){r=loadRoom(c); if(r) rooms.set(c,r);} if(r)ensureSeason(r); return r; }
+function getRoom(c) { if(!c)return null; let r=rooms.get(c); if(!r){r=loadRoom(c); if(r) rooms.set(c,r);} if(r){ensureBalance(r);ensureSeason(r);} return r; }
 
 function ensurePlayer(room, id, name) {
   let p=room.players[id];
-  if (!p) room.players[id] = p = { id, name:safeName(name), cash:500, inventory:copy(STARTER_STOCK), businesses:[], holdings:{}, x:0, z:22, color:`hsl(${Math.floor(Math.random()*360)} 65% 55%)`, online:true };
+  if (!p) room.players[id] = p = { id, name:safeName(name), cash:1000, inventory:copy(STARTER_STOCK), businesses:[], holdings:{}, x:0, z:22, color:`hsl(${Math.floor(Math.random()*360)} 65% 55%)`, online:true };
   p.name=safeName(name || p.name); p.online=true; return p;
 }
 function businessOwner(room,b,pid){ if(!b || b.ownerId!==pid) throw Error('Only the owner can do that.'); }
@@ -88,7 +90,8 @@ function createBusiness(room,p,type,plotId,name) {
   if(Object.values(room.businesses).some(b=>b.plotId===plot.id)) throw Error('That plot is already occupied.');
   debit(p,spec.cost,'You cannot afford that business.');
   const id=`B${room.nextBusiness++}`;
-  const b={ id,type,name:safeName(name)||`${p.name}'s ${spec.name}`,ownerId:p.id,plotId:plot.id,x:plot.x,z:plot.z,cash:0,inventory:copy(STARTER_STOCK),workers:0,workerWage:2,auto:false,pricing:{food:7,furniture:35},revenue:0,expenses:0,sharesOutstanding:1000,maxShares:2000,treasuryShares:0,shareholders:{[p.id]:1000},lastProduction:now(),productionEnds:0,recentTrades:[] };
+  const starter=copy(STARTER_STOCK);if(type==='factory')starter.wood=6;if(type==='store'){starter.food=4;starter.furniture=1;}
+  const b={ id,type,name:safeName(name)||`${p.name}'s ${spec.name}`,ownerId:p.id,plotId:plot.id,x:plot.x,z:plot.z,cash:50,inventory:starter,workers:0,workerWage:1,auto:false,pricing:{food:8,furniture:40},revenue:0,expenses:0,sharesOutstanding:1000,maxShares:2000,treasuryShares:0,shareholders:{[p.id]:1000},lastProduction:now(),productionEnds:0,recentTrades:[] };
   room.businesses[id]=b; p.businesses.push(id); p.holdings[id]=(p.holdings[id]||0)+1000; return b;
 }
 function startProduction(room,b,pid) {
@@ -169,6 +172,10 @@ function dividends(room,p,b,amount){
   businessOwner(room,b,p.id); const total=price(amount); if(total>b.cash) throw Error('Company does not have that much cash.'); b.cash=money(b.cash-total); b.expenses=money(b.expenses+total);
   let paid=0; for(const [pid,shares] of Object.entries(b.shareholders)){ const part=money(total*shares/b.sharesOutstanding); if(room.players[pid]){credit(room.players[pid],part); paid+=part;} } return money(paid);
 }
+function sellToTown(room,p,b,good,amount){
+  businessOwner(room,b,p.id);if(!Object.hasOwn(WHOLESALE,good))throw Error('That product cannot be sold.');const n=qty(amount);if(b.inventory[good]<n)throw Error(`Only ${b.inventory[good]} ${good} available.`);const sale=money(n*WHOLESALE[good]);if(room.npcFund<sale)throw Error('Town demand is temporarily exhausted. Try again soon.');b.inventory[good]-=n;b.cash=money(b.cash+sale);b.revenue=money(b.revenue+sale);room.npcFund=money(room.npcFund-sale);room.transactions.unshift({kind:'npc-wholesale',good,quantity:n,price:WHOLESALE[good],buyer:'Town wholesaler',seller:b.name,at:now()});room.transactions=room.transactions.slice(0,30);return sale;
+}
+function collectProfits(room,p,b){businessOwner(room,b,p.id);if(b.cash<=0)throw Error('This company has no cash to collect yet.');const amount=b.cash;b.cash=0;credit(p,amount);return amount;}
 function npcSales(room,t){
   if(room._lastNpc&&t-room._lastNpc<4000)return false; room._lastNpc=t; let changed=false;
   const stores=Object.values(room.businesses).filter(b=>b.type==='store');
@@ -197,6 +204,8 @@ wss.on('connection',ws=>{
     else if(m.type==='hire'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);const n=qty(m.count);debit(p,n*25);b.workers+=n;b.expenses=money(b.expenses+n*25);}
     else if(m.type==='toggleAuto'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);if(!b.workers)throw Error('Hire a worker first.');b.auto=!b.auto;if(b.auto&&!b.productionEnds&&BUSINESS[b.type].output)startProduction(r,b,p.id);}
     else if(m.type==='setRetailPrice'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);if(b.type!=='store')throw Error('Only stores set retail prices.');b.pricing[m.good]=price(m.price);}
+    else if(m.type==='sellToTown')sellToTown(r,p,r.businesses[m.businessId],m.good,m.quantity);
+    else if(m.type==='collectProfits')collectProfits(r,p,r.businesses[m.businessId]);
     else if(m.type==='transferCash'){const b=r.businesses[m.businessId];businessOwner(r,b,p.id);const a=price(m.amount);if(m.direction==='toBusiness'){debit(p,a);b.cash=money(b.cash+a);}else{if(b.cash<a)throw Error('Business cash is too low.');b.cash=money(b.cash-a);credit(p,a);}}
     else if(m.type==='goodsOrder')placeGoodsOrder(r,p,m);
     else if(m.type==='stockOrder')placeStockOrder(r,p,m);
@@ -210,6 +219,7 @@ wss.on('connection',ws=>{
 });
 setInterval(()=>{for(const r of rooms.values()){let changed=ensureSeason(r),t=now();for(const b of Object.values(r.businesses))changed=completeProduction(r,b,t)||changed;changed=npcSales(r,t)||changed;if(changed){saveRoom(r);broadcast(r);}}},1000);
 setInterval(()=>{for(const r of rooms.values())saveRoom(r)},15000);
+setInterval(()=>{for(const r of rooms.values())r.npcFund=Math.min(10000,money((r.npcFund||0)+100))},60000);
 server.listen(PORT,()=>console.log(`Market Square running at http://localhost:${PORT}`));
 function shutdown(){for(const r of rooms.values())saveRoom(r);server.close(()=>{db.close();process.exit(0)});setTimeout(()=>process.exit(0),2000).unref();}
 process.once('SIGINT',shutdown);process.once('SIGTERM',shutdown);

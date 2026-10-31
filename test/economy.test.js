@@ -22,22 +22,23 @@ test('authoritative two-player goods and stock trades persist',async t=>{
   send(a,'join',{code:room,playerId:'alice',name:'Alice'});let s=(await onceMessage(a,'state',m=>m.state.players.alice)).state;assert.ok(s.resetsAt>Date.now());
   send(a,'openBusiness',{businessType:'logging',plotId:0,name:'Alice Timber'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1)).state;
   send(a,'renameBusiness',{businessId:'B1',name:'North Star Timber'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1?.name==='North Star Timber')).state;assert.equal(s.businesses.B1.name,'North Star Timber');
-  send(a,'transferCash',{businessId:'B1',amount:100,direction:'toBusiness'});await onceMessage(a,'state',m=>m.state.businesses.B1.cash===100);
+  send(a,'transferCash',{businessId:'B1',amount:50,direction:'toBusiness'});await onceMessage(a,'state',m=>m.state.businesses.B1.cash===100);
   const b=await open(`ws://localhost:${port}`);t.after(()=>b.close());send(b,'join',{code:room,playerId:'bob',name:'Bob'});await onceMessage(b,'state',m=>m.state.players.bob);
   send(b,'move',{x:82,z:61});const movement=await onceMessage(a,'positions',m=>m.positions.bob?.x===82);assert.equal(movement.positions.bob.z,61);
   send(b,'openBusiness',{businessType:'farm',plotId:1,name:'Bob Farm'});await onceMessage(b,'state',m=>m.state.businesses.B2);
   // Produce wood, then escrow it in a sell order.
-  send(a,'produce',{businessId:'B1'});await onceMessage(a,'state',m=>m.state.businesses.B1.productionEnds>0);await delay(12200);s=(await onceMessage(a,'state',m=>m.state.businesses.B1.inventory.wood===3,3000)).state;
+  send(a,'produce',{businessId:'B1'});await onceMessage(a,'state',m=>m.state.businesses.B1.productionEnds>0);await delay(5200);s=(await onceMessage(a,'state',m=>m.state.businesses.B1.inventory.wood===5,3000)).state;
   send(a,'goodsOrder',{businessId:'B1',side:'sell',good:'wood',quantity:2,price:4});await onceMessage(a,'state',m=>m.state.goodsOrders.length===1);
-  send(b,'transferCash',{businessId:'B2',amount:50,direction:'toBusiness'});await onceMessage(b,'state',m=>m.state.businesses.B2.cash===50);
   send(b,'goodsOrder',{businessId:'B2',side:'buy',good:'wood',quantity:2,price:5});s=(await onceMessage(b,'state',m=>m.state.transactions[0]?.good==='wood')).state;
   assert.equal(s.businesses.B2.inventory.wood,2);assert.equal(s.businesses.B1.cash,108);assert.equal(s.transactions[0].price,4);
   // Company shares are capped, escrowed, and priced by the completed trade.
   send(a,'issueShares',{businessId:'B1',quantity:100,price:2});await onceMessage(a,'state',m=>m.state.stockOrders.length===1);
   send(b,'stockOrder',{businessId:'B1',side:'buy',quantity:25,price:2});s=(await onceMessage(b,'state',m=>m.state.stockTrades.length===1)).state;
   assert.equal(s.players.bob.holdings.B1,25);assert.equal(s.businesses.B1.cash,158);assert.equal(s.businesses.B1.recentTrades[0].price,2);assert.equal(s.businesses.B1.sharesOutstanding,1100);
-  send(b,'stockOrder',{businessId:'B1',side:'buy',quantity:10,price:1});s=(await onceMessage(b,'state',m=>m.state.stockOrders.some(o=>o.playerId==='bob'))).state;const pending=s.stockOrders.find(o=>o.playerId==='bob');assert.equal(s.players.bob.cash,290);
-  send(b,'cancelOrder',{kind:'stock',orderId:pending.id});s=(await onceMessage(b,'state',m=>!m.state.stockOrders.some(o=>o.id===pending.id))).state;assert.equal(s.players.bob.cash,300);
+  send(b,'stockOrder',{businessId:'B1',side:'buy',quantity:10,price:1});s=(await onceMessage(b,'state',m=>m.state.stockOrders.some(o=>o.playerId==='bob'))).state;const pending=s.stockOrders.find(o=>o.playerId==='bob');assert.equal(s.players.bob.cash,870);
+  send(b,'cancelOrder',{kind:'stock',orderId:pending.id});s=(await onceMessage(b,'state',m=>!m.state.stockOrders.some(o=>o.id===pending.id))).state;assert.equal(s.players.bob.cash,880);
+  send(a,'sellToTown',{businessId:'B1',good:'wood',quantity:3});s=(await onceMessage(a,'state',m=>m.state.businesses.B1.inventory.wood===0)).state;assert.equal(s.businesses.B1.cash,170);
+  send(a,'collectProfits',{businessId:'B1'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1.cash===0)).state;assert.equal(s.players.alice.cash,1040);
   send(a,'openBusiness',{businessType:'store',plotId:2,name:'Alice Market'});s=(await onceMessage(a,'state',m=>m.state.businesses.B3?.ownerId==='alice')).state;assert.equal(s.players.alice.businesses.length,2);
   a.close();await delay(150);const reconnect=await open(`ws://localhost:${port}`);t.after(()=>reconnect.close());send(reconnect,'join',{code:room,playerId:'alice',name:'Alice'});s=(await onceMessage(reconnect,'state',m=>m.state.players.alice?.businesses.length===2)).state;assert.equal(s.businesses.B3.name,'Alice Market');
 });
