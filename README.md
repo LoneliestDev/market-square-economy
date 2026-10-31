@@ -2,7 +2,7 @@
 
 A small authoritative multiplayer 3D economy game for up to 12 players per town. Players open logging companies, farms, furniture factories, and retail stores; produce and trade physical goods; hire workers; issue and trade shares; and distribute dividends.
 
-The expanded low-poly city includes 48 business plots, a broad road grid, an industrial district, moving delivery traffic, and an instanced skyline tuned for smooth browser rendering.
+The expanded low-poly city includes 80 business plots, a broad road grid, an industrial district, moving delivery traffic, and an instanced skyline tuned for smooth browser rendering.
 
 ## Run locally
 
@@ -16,6 +16,7 @@ npm start
 Open [http://localhost:3000](http://localhost:3000). Create a town, then open the same URL in another browser or private window and join using its five-letter room code. All runtime assets, including Three.js, are served locally.
 
 Progress is saved to `data/market-square.db`. Production is driven only while the server is running and resumes from its saved state without offline catch-up.
+Rooms run in monthly seasons. On the first UTC day of each month, money, companies, inventories, orders, and shares reset while player identities and the room code remain available for the new season. Graceful shutdowns flush all active rooms before exit, and WAL-mode SQLite plus periodic snapshots protect live progress.
 
 ## Controls
 

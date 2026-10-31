@@ -19,7 +19,7 @@ test('authoritative two-player goods and stock trades persist',async t=>{
   const child=spawn(process.execPath,['server.js'],{cwd:process.cwd(),env:{...process.env,PORT:String(port),DB_PATH:join(dir,'test.db')},stdio:['ignore','pipe','pipe']});
   t.after(()=>child.kill());await new Promise((resolve,reject)=>{child.stdout.on('data',d=>String(d).includes('running')&&resolve());child.once('exit',c=>reject(Error(`server exited ${c}`)))});
   const a=await open(`ws://localhost:${port}`);t.after(()=>a.close());send(a,'createRoom');const room=(await onceMessage(a,'roomCreated')).code;
-  send(a,'join',{code:room,playerId:'alice',name:'Alice'});let s=(await onceMessage(a,'state',m=>m.state.players.alice)).state;
+  send(a,'join',{code:room,playerId:'alice',name:'Alice'});let s=(await onceMessage(a,'state',m=>m.state.players.alice)).state;assert.ok(s.resetsAt>Date.now());
   send(a,'openBusiness',{businessType:'logging',plotId:0,name:'Alice Timber'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1)).state;
   send(a,'renameBusiness',{businessId:'B1',name:'North Star Timber'});s=(await onceMessage(a,'state',m=>m.state.businesses.B1?.name==='North Star Timber')).state;assert.equal(s.businesses.B1.name,'North Star Timber');
   send(a,'transferCash',{businessId:'B1',amount:100,direction:'toBusiness'});await onceMessage(a,'state',m=>m.state.businesses.B1.cash===100);
@@ -38,4 +38,6 @@ test('authoritative two-player goods and stock trades persist',async t=>{
   assert.equal(s.players.bob.holdings.B1,25);assert.equal(s.businesses.B1.cash,158);assert.equal(s.businesses.B1.recentTrades[0].price,2);assert.equal(s.businesses.B1.sharesOutstanding,1100);
   send(b,'stockOrder',{businessId:'B1',side:'buy',quantity:10,price:1});s=(await onceMessage(b,'state',m=>m.state.stockOrders.some(o=>o.playerId==='bob'))).state;const pending=s.stockOrders.find(o=>o.playerId==='bob');assert.equal(s.players.bob.cash,290);
   send(b,'cancelOrder',{kind:'stock',orderId:pending.id});s=(await onceMessage(b,'state',m=>!m.state.stockOrders.some(o=>o.id===pending.id))).state;assert.equal(s.players.bob.cash,300);
+  send(a,'openBusiness',{businessType:'store',plotId:2,name:'Alice Market'});s=(await onceMessage(a,'state',m=>m.state.businesses.B3?.ownerId==='alice')).state;assert.equal(s.players.alice.businesses.length,2);
+  a.close();await delay(150);const reconnect=await open(`ws://localhost:${port}`);t.after(()=>reconnect.close());send(reconnect,'join',{code:room,playerId:'alice',name:'Alice'});s=(await onceMessage(reconnect,'state',m=>m.state.players.alice?.businesses.length===2)).state;assert.equal(s.businesses.B3.name,'Alice Market');
 });

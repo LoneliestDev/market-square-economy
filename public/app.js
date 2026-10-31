@@ -5,7 +5,7 @@ const uid=()=>crypto.randomUUID();
 const playerId=localStorage.msPlayerId||(localStorage.msPlayerId=uid());
 let ws,state=null,me=null,currentPanel='',selectedBusiness=null,tutorialDismissed=false,pendingBusinessOpen=false;
 const BUSINESS={logging:{name:'Logging Company',icon:'🌲',cost:120,color:0x8c6746},farm:{name:'Farm',icon:'🌾',cost:100,color:0xd5ae52},factory:{name:'Furniture Factory',icon:'⚙',cost:180,color:0x7d8790},store:{name:'Retail Store',icon:'◆',cost:140,color:0x557b9d}};
-const PLOTS=[[-18,-13],[-6,-13],[6,-13],[18,-13],[-18,0],[-6,0],[6,0],[18,0],[-18,13],[-6,13],[6,13],[18,13],...[-72,-54,-36,36,54,72].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z]))].map(([x,z],id)=>({id,x,z}));
+const PLOTS=[[-18,-13],[-6,-13],[6,-13],[18,-13],[-18,0],[-6,0],[6,0],[18,0],[-18,13],[-6,13],[6,13],[18,13],...[-72,-54,-36,36,54,72].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z])),...[-90,-72,-54,-36,-18,18,36,54,72,90].flatMap(x=>[-70,70].map(z=>[x,z])),...[-90,90].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z]))].map(([x,z],id)=>({id,x,z}));
 const money=n=>`$${Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const age=t=>{const s=Math.max(0,Math.floor((Date.now()-t)/1000));return s<60?`${s}s ago`:`${Math.floor(s/60)}m ago`};
@@ -47,13 +47,18 @@ function labelSprite(text,bg='#244a3b'){const c=document.createElement('canvas')
 function makePlayer(p){const g=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.85,4,8),mat(new THREE.Color(p.color)));body.position.y=1.05;body.castShadow=true;g.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.36,12,8),mat(0xe1aa82));head.position.y=1.95;head.castShadow=true;g.add(head);const l=labelSprite(p.name,'#1f2b27');l.position.y=2.75;l.scale.set(2.9,.54,1);g.add(l);scene.add(g);return g}
 function makeBusiness(b){const g=new THREE.Group();g.position.set(b.x,0,b.z);const c=BUSINESS[b.type].color;
   const walls=new THREE.Mesh(new THREE.BoxGeometry(6.3,3.2,5.2),mat(c));walls.position.y=1.65;walls.castShadow=walls.receiveShadow=true;g.add(walls);
-  const roof=new THREE.Mesh(new THREE.ConeGeometry(4.4,2,4),mat(b.type==='farm'?0x9c5c3d:0x40584e));roof.position.y=4.1;roof.rotation.y=Math.PI/4;roof.castShadow=true;g.add(roof);
+  if(b.type==='factory'){
+    const roof=new THREE.Mesh(new THREE.BoxGeometry(6.7,.45,5.6),mat(0x3d484c));roof.position.y=3.45;roof.castShadow=true;g.add(roof);
+    for(const x of [-1.7,0,1.7]){const tooth=new THREE.Mesh(new THREE.ConeGeometry(1.45,1.2,4),mat(0x59666a));tooth.position.set(x,4.15,0);tooth.rotation.y=Math.PI/4;g.add(tooth)}
+    const annex=new THREE.Mesh(new THREE.BoxGeometry(3.2,2.25,2.3),mat(0x667378));annex.position.set(3.4,1.15,-.8);annex.castShadow=true;g.add(annex);
+    for(const x of [-2.1,0,2.1]){const stack=new THREE.Mesh(new THREE.CylinderGeometry(.3,.44,3.8,8),mat(0x4b5457));stack.position.set(x,5.2,-1.45);stack.castShadow=true;g.add(stack)}
+    const dock=new THREE.Mesh(new THREE.BoxGeometry(2.5,.45,1.2),mat(0xc6b083));dock.position.set(-1.4,.35,3.1);g.add(dock);
+  }else{const roof=new THREE.Mesh(new THREE.ConeGeometry(4.4,2,4),mat(b.type==='farm'?0x9c5c3d:0x40584e));roof.position.y=4.1;roof.rotation.y=Math.PI/4;roof.castShadow=true;g.add(roof)}
   const door=new THREE.Mesh(new THREE.BoxGeometry(1.2,2,.15),mat(0x4b3528));door.position.set(0,1,2.66);g.add(door);
   if(b.type==='logging'){for(let i=-2;i<=2;i++){const log=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,3,8),mat(0x7a4d2e));log.rotation.z=Math.PI/2;log.position.set(i*.25,.4,3.2);g.add(log)}}
   if(b.type==='farm'){for(let i=-2;i<=2;i++)for(let j=0;j<3;j++){const crop=new THREE.Mesh(new THREE.ConeGeometry(.12,.8,5),mat(0xd8b440));crop.position.set(-2+i,0.4,-3.1-j*.5);g.add(crop)}}
-  if(b.type==='factory'){const stack=new THREE.Mesh(new THREE.CylinderGeometry(.38,.52,3,8),mat(0x596167));stack.position.set(2.1,4.1,-1.2);g.add(stack)}
   if(b.type==='store'){const awning=new THREE.Mesh(new THREE.BoxGeometry(3,.28,1),mat(0xd7a643));awning.position.set(0,2.25,2.9);g.add(awning)}
-  const l=labelSprite(b.name);l.position.set(0,5.6,0);g.add(l);g.userData={businessId:b.id,companyName:b.name};g.traverse(o=>o.userData={...o.userData,businessId:b.id});scene.add(g);return g
+  const l=labelSprite(b.name);l.position.set(0,b.type==='factory'?7.6:5.6,0);g.add(l);g.userData={businessId:b.id,companyName:b.name};g.traverse(o=>o.userData={...o.userData,businessId:b.id});scene.add(g);return g
 }
 let yaw=0,pitch=.35,drag=false,lastX=0,lastY=0,targetDistance=10,cameraDistance=10,localReady=false;const keys={},localPosition=new THREE.Vector3(),cameraTarget=new THREE.Vector3();
 addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);
@@ -62,7 +67,7 @@ renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();targetDistan
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();renderer.domElement.addEventListener('click',e=>{if(Math.abs(e.clientX-lastX)>4)return;mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight*2-1);ray.setFromCamera(mouse,camera);const hit=ray.intersectObjects([...businessMeshes.values()],true)[0];if(hit){let o=hit.object;const id=o.userData.businessId;if(id){selectedBusiness=id;openPanel('business')}}});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 let last=performance.now(),lastMove=0;
-function animate(t){requestAnimationFrame(animate);const dt=Math.min(.05,(t-last)/1000);last=t;cameraDistance=THREE.MathUtils.damp(cameraDistance,targetDistance,7,dt);townVehicles.forEach((v,i)=>{v.position.x=((v.userData.start+100+t*.001*v.userData.speed)%200)-100;v.rotation.y=i%2?Math.PI:0});if(me&&localReady){let dx=(keys.KeyD?1:0)-(keys.KeyA?1:0),dz=(keys.KeyS?1:0)-(keys.KeyW?1:0);if(dx||dz){const len=Math.hypot(dx,dz);dx/=len;dz/=len;const sin=Math.sin(yaw),cos=Math.cos(yaw);localPosition.x=Math.max(-100,Math.min(100,localPosition.x+(dx*cos-dz*sin)*15*dt));localPosition.z=Math.max(-75,Math.min(75,localPosition.z+(dx*sin+dz*cos)*15*dt));if(t-lastMove>80){send('move',{x:localPosition.x,z:localPosition.z});lastMove=t}}
+function animate(t){requestAnimationFrame(animate);const dt=Math.min(.05,(t-last)/1000);last=t;cameraDistance=THREE.MathUtils.damp(cameraDistance,targetDistance,7,dt);townVehicles.forEach((v,i)=>{v.position.x=((v.userData.start+100+t*.001*v.userData.speed)%200)-100;v.rotation.y=i%2?Math.PI:0});if(me&&localReady){let dx=(keys.KeyD?1:0)-(keys.KeyA?1:0),dz=(keys.KeyS?1:0)-(keys.KeyW?1:0);if(dx||dz){const len=Math.hypot(dx,dz);dx/=len;dz/=len;const sin=Math.sin(yaw),cos=Math.cos(yaw),worldX=dx*cos+dz*sin,worldZ=-dx*sin+dz*cos;localPosition.x=Math.max(-100,Math.min(100,localPosition.x+worldX*15*dt));localPosition.z=Math.max(-75,Math.min(75,localPosition.z+worldZ*15*dt));if(t-lastMove>80){send('move',{x:localPosition.x,z:localPosition.z});lastMove=t}}
     cameraTarget.set(localPosition.x,.75,localPosition.z);const cp=Math.cos(pitch);camera.position.set(cameraTarget.x+Math.sin(yaw)*cp*cameraDistance,cameraTarget.y+Math.sin(pitch)*cameraDistance,cameraTarget.z+Math.cos(yaw)*cp*cameraDistance);camera.lookAt(cameraTarget);
   }renderer.render(scene,camera)}animate(performance.now());
 
@@ -82,14 +87,15 @@ $('#joinRoom').onclick=()=>{const name=$('#playerName').value.trim(),code=$('#ro
 $('#copyCode').onclick=()=>navigator.clipboard.writeText(state.code).then(()=>toast('Room code copied.'));
 $('#closePanel').onclick=()=>{$('#panel').classList.add('hidden');currentPanel='';$$('#dock button').forEach(b=>b.classList.remove('active'))};
 $('#dismissTutorial').onclick=()=>{tutorialDismissed=true;$('#tutorial').classList.add('hidden')};
-$$('#dock button').forEach(b=>b.onclick=()=>openPanel(b.dataset.panel));
+$$('#dock button').forEach(b=>b.onclick=()=>{if(b.dataset.panel==='business')selectedBusiness=null;openPanel(b.dataset.panel)});
 
 function render(){
-  $('#codeLabel').textContent=state.code;$('#cash').textContent=money(me.cash);$('#online').textContent=`${Object.values(state.players).filter(p=>p.online).length} / 12`;
+  $('#codeLabel').textContent=state.code;$('#cash').textContent=money(me.cash);$('#online').textContent=`${Object.values(state.players).filter(p=>p.online).length} / 12`;const resetDays=Math.max(0,Math.ceil((state.resetsAt-Date.now())/86400000));$('#reset').textContent=resetDays===1?'1 day':`${resetDays} days`;
   const totals=['wood','food','furniture'].reduce((a,g)=>(a[g]=me.businesses.reduce((n,id)=>n+(state.businesses[id]?.inventory[g]||0),0),a),{});
   $('#inventory').innerHTML=['wood','food','furniture'].map(g=>`<div class="chip">${g==='wood'?'▤':g==='food'?'●':'▰'}<b>${totals[g]}</b>${g}</div>`).join('');
-  $('#owned').innerHTML=me.businesses.length?me.businesses.map(id=>`<button data-business="${id}">${esc(state.businesses[id]?.name||id)}</button>`).join(''):'<span class="sub">No businesses yet</span>';
+  $('#owned').innerHTML=`${me.businesses.length?me.businesses.map(id=>`<button data-business="${id}">${esc(state.businesses[id]?.name||id)}</button>`).join(''):'<span class="sub">No businesses yet</span>'}<button class="new-company" data-new-company>＋ New company</button>`;
   $$('#owned button').forEach(b=>b.onclick=()=>{selectedBusiness=b.dataset.business;openPanel('business')});
+  $('[data-new-company]').onclick=()=>{selectedBusiness=null;openPanel('business')};
   renderTutorial();if(currentPanel)renderPanel();
 }
 function renderTutorial(){if(tutorialDismissed)return;let n=1,title='Claim your first plot',text='Open Business, pick a free plot and choose a company type.';if(me.businesses.length){n=2;const bs=me.businesses.map(id=>state.businesses[id]);if(bs.some(b=>Object.values(b.inventory).some(x=>x>0))){n=3;title='Make your first sale';text='Place a sell order, or use a store to sell food or furniture to NPC customers.'}else{title='Produce your first goods';text='Open your business and start a timed production batch.'}}if(state.transactions.some(t=>t.seller&&me.businesses.some(id=>state.businesses[id]?.name===t.seller))){n=4;title='Tutorial complete';text='Reinvest, expand to another plot, or buy shares in another player’s company.'}$('#tutorialNum').textContent=n;$('#tutorialTitle').textContent=title;$('#tutorialText').textContent=text;$('#tutorialProgress').style.width=`${n*25}%`}
@@ -107,7 +113,7 @@ function renderBusiness(){
   }
   const owned=b.ownerId===playerId,spec=BUSINESS[b.type],remain=Math.max(0,b.productionEnds-Date.now()),duration=({logging:12,farm:10,factory:18}[b.type]||1)*1000,progress=b.productionEnds?Math.max(0,100-remain/duration*100):0;
   $('#panelContent').innerHTML=`<h2>${esc(b.name)}</h2><p class="sub">${spec.icon} ${spec.name} · Plot ${b.plotId+1} · Owner: ${esc(state.players[b.ownerId]?.name)}</p>
-    ${owned?`<div class="company-name-row"><input id="renameValue" maxlength="20" value="${esc(b.name)}" aria-label="Company name"><button id="renameBiz">Rename</button></div>`:''}
+    ${owned?`<div class="company-name-row"><input id="renameValue" maxlength="20" value="${esc(b.name)}" aria-label="Company name"><button id="renameBiz">Rename</button></div><button id="newCompany" class="action">＋ Open another company</button>`:''}
     <div class="metric-grid"><div class="metric"><span>CASH</span><b>${money(b.cash)}</b></div><div class="metric"><span>REVENUE</span><b>${money(b.revenue)}</b></div><div class="metric"><span>EXPENSES</span><b>${money(b.expenses)}</b></div><div class="metric"><span>PROFIT</span><b class="${b.revenue-b.expenses>=0?'positive':'negative'}">${money(b.revenue-b.expenses)}</b></div></div>
     <div class="section"><h3>BUSINESS INVENTORY</h3><div class="inventory">${['wood','food','furniture'].map(g=>`<div class="chip"><b>${b.inventory[g]}</b>${g}</div>`).join('')}</div></div>
     ${owned?`<div class="section"><h3>OPERATIONS</h3>${spec.name==='Retail Store'?`<div class="grid2"><label class="field">FOOD RETAIL PRICE<input id="foodPrice" type="number" step=".25" value="${b.pricing.food}"></label><label class="field">FURNITURE RETAIL PRICE<input id="furnPrice" type="number" step="1" value="${b.pricing.furniture}"></label></div><button id="savePrices" class="action">Update prices</button>`:`${b.productionEnds?`<p class="sub">Production in progress · ${Math.ceil(remain/1000)} seconds remaining</p><div class="bar"><i style="width:${progress}%"></i></div>`:`<button id="produce" class="primary">Start production batch</button>`}<div class="row action"><span class="grow sub">${b.workers} worker${b.workers===1?'':'s'} · $${b.workerWage}/batch each</span><button id="hire">Hire · $25</button><button id="auto" ${!b.workers?'disabled':''}>${b.auto?'Stop':'Automate'}</button></div>`}
@@ -115,6 +121,7 @@ function renderBusiness(){
     <details class="advanced"><summary>Ownership & investor tools</summary><div class="section"><h3>OWNERSHIP</h3><p class="sub">${b.sharesOutstanding.toLocaleString()} shares outstanding · issue cap ${b.maxShares.toLocaleString()}</p>${Object.entries(b.shareholders).filter(([,n])=>n>0).map(([id,n])=>`<div class="row"><span class="grow">${esc(state.players[id]?.name||'Former player')}</span><b>${(n/b.sharesOutstanding*100).toFixed(1)}%</b></div>`).join('')}</div>
     ${owned?`<div class="section"><h3>RAISE MONEY OR PAY INVESTORS</h3><div class="grid2"><label class="field">NEW SHARES<input id="issueQty" type="number" value="100"></label><label class="field">ASK PRICE<input id="issuePrice" type="number" step=".01" value="5"></label></div><button id="issue" class="action">Offer shares</button><div class="row action"><input id="dividendAmount" type="number" step=".01" placeholder="Dividend total"><button id="dividend">Pay dividend</button></div></div>`:''}</details>`;
   if(!owned)return;
+  $('#newCompany').onclick=()=>{selectedBusiness=null;renderBusiness()};
   $('#renameBiz').onclick=()=>send('renameBusiness',{businessId:b.id,name:$('#renameValue').value});
   $('#produce')?.addEventListener('click',()=>send('produce',{businessId:b.id}));$('#hire')?.addEventListener('click',()=>send('hire',{businessId:b.id,count:1}));$('#auto')?.addEventListener('click',()=>send('toggleAuto',{businessId:b.id}));
   $('#savePrices')?.addEventListener('click',()=>{send('setRetailPrice',{businessId:b.id,good:'food',price:$('#foodPrice').value});send('setRetailPrice',{businessId:b.id,good:'furniture',price:$('#furnPrice').value})});
@@ -140,5 +147,5 @@ function renderStocks(){const companies=Object.values(state.businesses);const se
   $$('[data-cancel-stock]').forEach(x=>x.onclick=()=>send('cancelOrder',{kind:'stock',orderId:x.dataset.cancelStock}));
 }
 function renderPlayers(){
-  $('#panelContent').innerHTML=`<h2>Town residents</h2><p class="sub">Invite friends with room code <b>${state.code}</b>. Reconnecting with the same browser restores progress.</p><div class="cards">${Object.values(state.players).map(p=>`<div class="company row"><span style="width:10px;height:10px;border-radius:50%;background:${p.online?'#43a56c':'#a9b0ab'}"></span><div class="grow"><b>${esc(p.name)} ${p.id===playerId?'(you)':''}</b><p>${p.businesses.length} business${p.businesses.length===1?'':'es'} · ${Object.values(p.holdings).reduce((a,b)=>a+b,0).toLocaleString()} shares</p></div><span class="badge">${p.online?'ONLINE':'OFFLINE'}</span></div>`).join('')}</div>`;
+  $('#panelContent').innerHTML=`<h2>Town residents</h2><p class="sub">Invite friends with room code <b>${state.code}</b>. Reconnecting with the same browser restores progress.</p><div class="notice">Season ${esc(state.season)} resets ${new Date(state.resetsAt).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})}. Player identities and this room code remain; the economy starts fresh.</div><div class="cards section">${Object.values(state.players).map(p=>`<div class="company row"><span style="width:10px;height:10px;border-radius:50%;background:${p.online?'#43a56c':'#a9b0ab'}"></span><div class="grow"><b>${esc(p.name)} ${p.id===playerId?'(you)':''}</b><p>${p.businesses.length} business${p.businesses.length===1?'':'es'} · ${Object.values(p.holdings).reduce((a,b)=>a+b,0).toLocaleString()} shares</p></div><span class="badge">${p.online?'ONLINE':'OFFLINE'}</span></div>`).join('')}</div>`;
 }

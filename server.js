@@ -11,6 +11,7 @@ const PUBLIC = join(ROOT, 'public');
 const DB_PATH = process.env.DB_PATH || join(ROOT, 'data', 'market-square.db');
 mkdirSync(join(DB_PATH, '..'), { recursive: true });
 const db = new DatabaseSync(DB_PATH);
+db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;');
 db.exec(`CREATE TABLE IF NOT EXISTS rooms (
   code TEXT PRIMARY KEY,
   state TEXT NOT NULL,
@@ -21,7 +22,9 @@ const PORT = Number(process.env.PORT || 3000);
 const MAX_PLAYERS = 12;
 const PLOTS = [
   [-18,-13],[-6,-13],[6,-13],[18,-13],[-18,0],[-6,0],[6,0],[18,0],[-18,13],[-6,13],[6,13],[18,13],
-  ...[-72,-54,-36,36,54,72].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z]))
+  ...[-72,-54,-36,36,54,72].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z])),
+  ...[-90,-72,-54,-36,-18,18,36,54,72,90].flatMap(x=>[-70,70].map(z=>[x,z])),
+  ...[-90,90].flatMap(x=>[-50,-30,-10,10,30,50].map(z=>[x,z]))
 ].map(([x,z], id) => ({ id, x, z }));
 const BUSINESS = {
   logging: { name:'Logging Co.', cost:120, output:'wood', seconds:12, amount:3, input:{} },
@@ -33,17 +36,25 @@ const STARTER_STOCK = { wood:0, food:0, furniture:0 };
 
 const copy = x => JSON.parse(JSON.stringify(x));
 const now = () => Date.now();
+const nextMonthStart = (time=now()) => { const d=new Date(time); return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1); };
+const seasonName = time => { const d=new Date(time); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`; };
 const money = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const code = () => Math.random().toString(36).slice(2,7).toUpperCase();
 const safeName = v => String(v || 'Player').replace(/[^a-zA-Z0-9 _-]/g,'').trim().slice(0,20) || 'Player';
 
 function freshRoom(roomCode) {
-  return { code:roomCode, createdAt:now(), players:{}, businesses:{}, goodsOrders:[], stockOrders:[], transactions:[], stockTrades:[], npcFund:4000, nextBusiness:1, nextOrder:1 };
+  return { code:roomCode, createdAt:now(), season:seasonName(now()), resetsAt:nextMonthStart(), players:{}, businesses:{}, goodsOrders:[], stockOrders:[], transactions:[], stockTrades:[], npcFund:4000, nextBusiness:1, nextOrder:1 };
+}
+function ensureSeason(room) {
+  if(!room.resetsAt){room.season=seasonName(now());room.resetsAt=nextMonthStart();return false;}
+  if(now()<room.resetsAt)return false;
+  for(const p of Object.values(room.players)){p.cash=500;p.inventory=copy(STARTER_STOCK);p.businesses=[];p.holdings={};p.x=0;p.z=22;}
+  room.businesses={};room.goodsOrders=[];room.stockOrders=[];room.transactions=[];room.stockTrades=[];room.npcFund=4000;room.nextBusiness=1;room.nextOrder=1;room.season=seasonName(now());room.resetsAt=nextMonthStart();return true;
 }
 function loadRoom(roomCode) {
   const row = db.prepare('SELECT state,updated_at FROM rooms WHERE code=?').get(roomCode);
   if(!row)return null;
-  const room=JSON.parse(row.state),offlineFor=Math.max(0,now()-Number(row.updated_at));
+  const room=JSON.parse(row.state),offlineFor=Math.max(0,now()-Number(row.updated_at));ensureSeason(room);
   // Active batches are paused, not completed, while this room is unloaded/offline.
   for(const b of Object.values(room.businesses))if(b.productionEnds>row.updated_at)b.productionEnds+=offlineFor;
   return room;
@@ -57,7 +68,7 @@ function publicState(room) {
   return { ...room, players:Object.fromEntries(Object.entries(room.players).map(([id,p]) => [id,{...p, token:undefined}])) };
 }
 const rooms = new Map();
-function getRoom(c) { if(!c)return null; let r=rooms.get(c); if(!r){r=loadRoom(c); if(r) rooms.set(c,r);} return r; }
+function getRoom(c) { if(!c)return null; let r=rooms.get(c); if(!r){r=loadRoom(c); if(r) rooms.set(c,r);} if(r)ensureSeason(r); return r; }
 
 function ensurePlayer(room, id, name) {
   let p=room.players[id];
@@ -197,6 +208,8 @@ wss.on('connection',ws=>{
   }catch(e){fail(ws,e)} });
   ws.on('close',()=>{const r=getRoom(ws.roomCode);if(r?.players[ws.playerId]){r.players[ws.playerId].online=false;saveRoom(r);broadcast(r);}});
 });
-setInterval(()=>{for(const r of rooms.values()){let changed=false;const t=now();for(const b of Object.values(r.businesses))changed=completeProduction(r,b,t)||changed;changed=npcSales(r,t)||changed;if(changed){saveRoom(r);broadcast(r);}}},1000);
+setInterval(()=>{for(const r of rooms.values()){let changed=ensureSeason(r),t=now();for(const b of Object.values(r.businesses))changed=completeProduction(r,b,t)||changed;changed=npcSales(r,t)||changed;if(changed){saveRoom(r);broadcast(r);}}},1000);
 setInterval(()=>{for(const r of rooms.values())saveRoom(r)},15000);
 server.listen(PORT,()=>console.log(`Market Square running at http://localhost:${PORT}`));
+function shutdown(){for(const r of rooms.values())saveRoom(r);server.close(()=>{db.close();process.exit(0)});setTimeout(()=>process.exit(0),2000).unref();}
+process.once('SIGINT',shutdown);process.once('SIGTERM',shutdown);
